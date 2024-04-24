@@ -1,0 +1,243 @@
+\section{流水线}
+\subsection{流水线原理}
+\subsubsection{什么是流水线}
+流水线设计就是将组合逻辑系统地分割，并在各个部分（分级）之间插入寄存器，并暂存中间数据的方法。目的是将一个大操作分解成若干的小操作，每一步小操作的时间较小，所以能提高频率，各小操作能并行执行，所以能提高数据吞吐率（提高处理速度）。
+
+\subsubsection{什么时候用流水线设计}
+使用流水线一般是时序比较紧张，对电路工作频率较高的时候。典型情况如下：
+\begin{enumerate}
+    \item 功能模块之间的流水线，用乒乓 buffer 来交互数据。代价是增加了 memory 的数量，但是和获得的巨大性能提升相比，可以忽略不计。
+    \item I/O 瓶颈，比如某个运算需要输入 8 个数据，而 memroy 只能同时提供 2个数据，如果通过适当划分运算步骤，使用流水线反而会减少面积。
+    \item 片内 sram的读操作，因为sram的读操作本身就是两极流水线，除非下一步操作依赖读结果，否则使用流水线是自然而然的事情。
+    \item 组合逻辑太长，比如(a+b)*c，那么在加法和乘法之间插入寄存器是比较稳妥的做法。
+\end{enumerate}
+
+\subsubsection{使用流水线的优缺点}
+
+\textbf{优点}：流水线缩短了在一个时钟周期内给的那个信号必须通过的通路长度，增加了数据吞吐量，从而可以提高时钟频率，但也导致了数据的延时。
+% 举例如下：
+
+% 一个 2 级组合逻辑，假定每级延迟相同为 Tpd，
+% \begin{enumerate}
+%     \item 无流水线的总延迟就是2Tpd，可以在一个时钟周期完成，但是时钟周期受限制在 2Tpd；
+%     \item 流水线：
+%     每一级加入寄存器（延迟为 Tco）后，单级的延迟为 Tpd+Tco，每级消耗一个时钟周期，流水线需要 2 个时钟周期
+%     来获得第一个计算结果，称 为首次延迟，它要 2*（ Tpd+Tco），但是执行重复操作时，只要一个时钟周期来获得最后的
+%     计算结果，称为吞吐延迟（ Tpd+Tco）。可见只要 Tco 小于 Tpd，流水线就可以提高速度。 特别需要说明的是，流水线
+%     并不减小单次操作的时间，减小的是整个数据的操作时间，请大家认真体会。
+% \end{enumerate}
+
+\textbf{缺点}： 功耗增加，面积增加，硬件复杂度增加，特别对于复杂逻辑如 CPU 的流水线而言，流水越深，发生需要暂停流水线或刷新流水线的情况时，时间损失越大。
+
+所以使用流水线并非有利无害，设计时需权衡考虑。
+
+
+\subsection{流水线基础示例}
+首先要说明的一点是，流水线电路纯粹就是一个数字电路的概念，不要一谈到流水线就仅仅认为是处理器中 的流水线。
+
+我们先来看一个完全不会被阻塞的 3 级流水线电路怎么写。
+\begin{lstlisting}[language=Verilog,label=lst:3_stage_pipeline,caption=无阻塞3级流水线实现,numbers=left,xleftmargin=5em,xrightmargin=5em, aboveskip=2em]
+module non_stall_pipeline #
+(
+    parameter WIDTH = 100
+)
+(
+    input              clk,
+    input  [WIDTH-1:0] datain,
+    output [WIDTH-1:0] dataout
+);
+
+reg [WIDTH-1:0] pipe1_data;
+reg [WIDTH-1:0] pipe2_data;
+reg [WIDTH-1:0] pipe3_data;
+
+always @(posedge clk) begin
+    pipe1_data <= datain;
+end
+
+always @(posedge clk) begin
+    pipe2_data <= pipe1_data;
+end
+
+always @(posedge clk) begin
+    pipe3_data <= pipe2_data;
+end
+
+assign dataout = pipe3_data;
+
+endmodule
+\end{lstlisting}
+
+但是实际电路设计中，并不总是上面这种无阻塞的流水线。下面给出一个具有阻塞功能的流水线代码。
+\begin{lstlisting}[language=Verilog,label=lst:3_stage_pipeline_stall_flush,caption=有阻塞3级流水线实现,numbers=left,xleftmargin=5em,xrightmargin=5em, aboveskip=2em]
+module stallable_pipeline #
+(
+parameter WIDTH = 100
+)
+(
+input              clk,
+input              rst,
+input              validin,
+input  [WIDTH-1:0] datain,
+input              out_allow,
+output             validout,
+output [WIDTH-1:0] dataout
+);
+
+reg             pipe1_valid;
+reg [WIDTH-1:0] pipe1_data;
+reg             pipe2_valid;
+reg [WIDTH-1:0] pipe2_data;
+reg             pipe3_valid;
+reg [WIDTH-1:0] pipe3_data;
+
+// pipeline stage1
+wire            pipe1_allowin;
+wire            pipe1_ready_go;
+wire            pipe1_to_pipe2_valid;
+
+assign pipe1_ready_go = ……
+assign pipe1_allowin = !pipe1_valid || pipe1_ready_go && pipe2_allowin;
+assign pipe1_to_pipe2_valid = pipe1_valid && pipe1_ready_go;
+
+always @(posedge clk) begin
+    if (rst) begin
+        pipe1_valid <= 1’b0;
+    end
+    else if (pipe1_allowin) begin
+        pipe1_valid <= validin;
+    end
+    if (validin && pipe1_allowin) begin
+        pipe1_data <= datain;
+    end
+end
+
+// pipeline stage2
+wire            pipe2_allowin;
+wire            pipe2_ready_go;
+wire            pipe2_to_pipe3_valid;
+
+assign pipe2_ready_go = ……
+assign pipe2_allowin = !pipe2_valid || pipe2_ready_go && pipe3_allowin;
+assign pipe2_to_pipe3_valid = pipe2_valid && pipe2_ready_go;
+
+always @(posedge clk) begin
+    if (rst) begin
+        pipe2_valid <= 1’b0;
+    end
+    else if (pipe2_allowin) begin
+        pipe2_valid <= pipe1_to_pipe2_valid;
+    end
+    if (pipe1_to_pipe2_valid && pipe2_allowin) begin
+        pipe2_data <= pipe1_data;
+    end
+end
+
+// pipeline stage3
+wire            pipe3_allowin;
+wire            pipe3_ready_go;
+
+assign pipe3_ready_go = ……
+assign pipe3_allowin = !pipe3_valid || pipe3_ready_go && out_allow;
+
+always @(posedge clk) begin
+    if (rst) begin
+        pipe3_valid <= 1’b0;
+    end
+    else if (pipe3_allowin) begin
+        pipe3_valid <= pipe2_to_pipe3_valid;
+    end
+    if (pipe2_to_pipe3_valid && pipe3_allowin) begin
+        pipe3_data <= pipe2_data;
+    end
+end
+
+assign validout = pipe3_valid && pipe3_ready_go;
+assign dataout  = pipe3_data;
+
+endmodule
+\end{lstlisting}
+
+上述代码表述中pipe\textbf{X}\_valid为1表示第X级流水级上当前存有有效的数据，为0表示第X级是空的。因为控制位的好处是，清空流水线的时候不用刷各级流水线data域的值，可以节约逻辑资源，但是需要注意的是根据流水 级的data域信息产生控制信号时，有时候不要忘记“与上”这一级的 valid 信号。
+
+pipe\textbf{X}\_allowin为1表示第X级可以接收前一级流水送来的数据。
+
+上面流水线的 RTL 写法对于流水级的关键控制信号采用了链式写法。这样写的好处是，如果发生流水级功能调整时，譬如将一级再切分为两级，或者将某一级的停顿周期数改变了，都只需要修改局部，不会涉及全局性的 调整。有的同学可能会觉得我这种写法很麻烦，觉得自己写出来的简单一些。请你们针对具体情况分析，是否对于你所涉及的流水线，上面给出的代码中，某些pipeX\_allowin和pipeX\_ready\_go可以恒置为1，将其代入上面的表达式中，并将级联的控制信号完全展开，就形成了你们的那种简单版本。这里给出这样的一个流水线电路的“模板”式写法，主要是因为它易于理解不易出错，当同学们在自己进行流水线设计时如果因为流水级控制信号 搞得很糊涂时，可以回过头来看看此处给出的例子。
+
+再额外说一点，上面的写法是把流水线的 control logic 和 data path 写到了一个模块内部。你也可以把两者分在不同的模块中。国外的教科书上在描述流水线 CPU 时，通常会在流水线之外画一个叫做 pipeline control logic 的椭圆形框，从这个框引出控制信号去往各级流水所在触发器的使能端。这就是把 control logic 和 data path 分离的写法。 我们在上面给出的例子，pipeX\_data 就是 data path主体。
+ 
+\subsection{8bit全加器示例}
+\subsubsection{非流水线方式}
+\begin{lstlisting}[language=Verilog,label=lst:no_stage,caption=8bit全加器非流水线实现,numbers=left,xleftmargin=5em,xrightmargin=5em, aboveskip=2em]
+module adder_8bits(
+    a, 
+    b, 
+    c
+);
+input  [7:0] a;
+input  [7:0] b;
+output [8:0] c;
+
+assign c[8:0] = {1'd0, a} + {1'd0, b};
+endmodule
+\end{lstlisting}
+\subsubsection{2级流水线}
+\begin{lstlisting}[language=Verilog,label=lst:2_stage_pipeline,caption=8bit全加器2级流水线实现,numbers=left,xleftmargin=5em,xrightmargin=5em, aboveskip=2em]
+module adder_4bits_2steps(cin_a, cin_b, cin, clk, cout, sum);
+input [7:0]     cin_a;
+input [7:0]     cin_b;
+input           cin;
+input           clk;
+output          cout;
+output [7:0]    sum;
+	 
+reg         cout;
+reg         cout_temp;
+reg [7:0]   sum;
+reg [3:0]   sum_temp;
+	 
+always @(posedge clk) begin
+    {cout_temp,sum_temp} <= cin_a[3:0] + cin_b[3:0] + cin;
+end
+	 
+always @(posedge clk) begin
+    {cout,sum} <= {{1'b0,cin_a[7:4]} + {1'b0,cin_b[7:4]} + cout_temp, sum_temp};
+end
+endmodule
+\end{lstlisting}
+\subsubsection{4级流水线}
+\begin{lstlisting}[language=Verilog,label=lst:4_stage_pipeline,caption=8bit全加器4级流水线实现,numbers=left,xleftmargin=5em,xrightmargin=5em, aboveskip=2em]
+module adder_8bits_4steps(cin_a, cin_b, c_in, clk, c_out, sum_out);
+input [7:0]     cin_a;
+input [7:0]     cin_b;
+input           c_in;
+input           clk;
+output          c_out;
+output [7:0]    sum_out;
+	 
+reg c_out;
+reg c_out_t1, c_out_t2, c_out_t3;
+	 
+reg [7:0] sum_out;
+reg [1:0] sum_out_t1;
+reg [3:0] sum_out_t2;
+reg [5:0] sum_out_t3;
+	 
+always @(posedge clk) begin
+    {c_out_t1, sum_out_t1} <= {1'b0, cin_a[1:0]} + {1'b0, cin_b[1:0]} + c_in;
+end
+	 
+always @(posedge clk) begin
+    {c_out_t2, sum_out_t2} <= {{1'b0, cin_a[3:2]} + {1'b0, cin_b[3:2]} + c_out_t1, sum_out_t1};
+end
+	 
+always @(posedge clk) begin
+    {c_out_t3, sum_out_t3} <= {{1'b0, cin_a[5:4]} + {1'b0, cin_b[5:4]} + c_out_t2, sum_out_t2};
+end
+	 
+always @(posedge clk) begin
+    {c_out, sum_out} <= {{1'b0, cin_a[7:6]} + {1'b0, cin_b[7:6]} + c_out_t3, sum_out_t3};
+end
+
+endmodule
+\end{lstlisting}

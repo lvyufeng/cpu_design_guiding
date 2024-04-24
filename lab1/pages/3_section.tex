@@ -1,0 +1,93 @@
+\section{Verilog不同实现方式}
+验证实验给出两种不同的组合逻辑实现方式：
+
+\begin{lstlisting}[language=Verilog,label=lst:assign,caption=assign实现组合逻辑,numbers=left,xleftmargin=5em,xrightmargin=5em, aboveskip=2em]
+module calculate(
+    input wire [7:0] num1,
+    input wire [2:0] op,
+    output [31:0] result
+    );
+    wire [31:0] num2;
+    wire [31:0] Sign_extend;
+    
+    assign num2 = 32'h00000001;
+    assign Sign_extend={{24{1'b0}},num1[7:0]};
+    assign result = (op == 3'b000)? Sign_extend + num2:
+                    (op == 3'b001)? Sign_extend - num2:
+                    (op == 3'b010)? Sign_extend & num2:
+                    (op == 3'b011)? Sign_extend | num2:
+                    (op == 3'b100)? ~Sign_extend: 32'h00000000;
+endmodule
+\end{lstlisting}
+
+
+\begin{lstlisting}[language = Verilog,label=lst:always,caption=always实现组合逻辑,numbers=left,xleftmargin=5em,xrightmargin=5em, aboveskip=2em]
+module calculate(
+    input wire [7:0] num1,
+    input wire [2:0] op,
+    output reg [31:0] result
+    );
+    reg [31:0] num2;
+    reg[31:0] Sign_extend;
+    always @(op) begin
+       num2 = 32'h00000001;
+       Sign_extend={24'h000000,num1[7:0]};
+            case(op)
+                3'b000:result = Sign_extend + num2;
+                3'b001:result = Sign_extend - num2; 
+                3'b010:result = Sign_extend &  num2;
+                3'b011:result = Sign_extend |  num2;
+                3'b100:result = ~Sign_extend  ;          
+                default:result = 32'h00000000;
+            endcase
+        end
+endmodule
+\end{lstlisting}
+
+二者区别对比如下:
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{c|c|c}
+          \hline
+          & assign & always  \\
+          \hline
+          result    & wire & reg \\
+          num2      & wire  & reg \\
+          sign\_extend & wire &  reg\\
+          \hline
+    \end{tabular}
+    \caption{assign \& always 信号对比}
+    \label{tab:sig_compare}
+\end{table}
+Always即可实现组合逻辑，也可实现时序逻辑：
+\begin{enumerate}[(1)]
+    \item always @（a or b or c）或always@（*）形式的，即不带时钟边沿的，综合出来还是组合逻辑；
+    \item always @（posedge clk）形式的，即带有边沿的，综合出来一般是时序逻辑，会包含触发器（Flip-Flop）
+\end{enumerate}
+
+观察Listing~\ref{lst:always}中always的触发信号op，可以得知其为组合逻辑。在这里，给出两种方式在FPGA资源及编程难度上的对比。
+
+
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{c|p{5cm}|p{5cm}}
+         \hline
+          & assign & always \\
+         \hline
+         资源占用  &  使用wire变量，综合得到的组合逻辑全部由导线构成，不占用FPGA资源 & 由于内部赋值与输出都需要使用reg变量，同为组合逻辑，需占用一定资源 \\
+         \hline
+         编程及理解难度 & 面向信号进行状态描述，一般需要考虑单个信号在所有状态下的可能性，需要完全理解后进行编程。
+        
+        阅读者理解难度大。
+        & 面向实验需求描述，always模块内书写方式与高级语言相仿，可以按照实验要求逐一列举。
+
+        阅读者理解较容易。
+        \\
+         \hline
+    \end{tabular}
+    \caption{assign \& always 设计对比}
+    \label{tab:design_compare}
+\end{table}
+
+\textcolor{red}{\textbf{注意:}}\textbf{Imagination及龙芯高校开源计划代码均采取assign方式，实验推荐使用assign方式实现组合逻辑。设计实验中新增内容使用assign方式增加输出信号更为简单。}

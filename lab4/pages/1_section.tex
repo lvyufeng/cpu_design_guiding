@@ -1,0 +1,74 @@
+\section{实验四 \quad 流水线MIPS处理器设计}
+在实验三中已介绍过MIPS传统的五级流水线阶段，分别是\textit{取指、译码、执行、访存、回写(Instruction Fetch, Decode, Execution, Memory Request, Write Back)}，五阶段。
+
+单周期CPU虽然CPI为1，但由于时钟周期取决于时间最长的指令(如lw、sw)没有很好的性能，而多周期虽然能提升性能但仍旧无法满足当今处理器的需求。流水线能够很好地解决效率问题，通过分阶段，达到指令的并行执行。同时，在单周期的基础上，能够很容易地使用触发器做阶段分隔，实现流水线。
+
+本次实验将从实验三单周期处理器过渡至五级流水，并将解决冒险(hazard)问题。
+
+\subsection{实验目的}
+\begin{enumerate}
+	\item 掌握流水线(Pipelined)处理器的思想；
+	\item 掌握单周期处理中执行阶段的划分；
+	\item 了解流水线处理器遇到的冒险；
+	\item 掌握数据前推、流水线暂停等冒险解决方式。
+\end{enumerate}
+\subsection{实验设备}
+\begin{enumerate}
+    \item 计算机1台(尽可能达到8G及以上内存)；
+    \item Xilinx Vivado开发套件(2019.1版本)。
+\end{enumerate}
+\textcolor{red}{注：本次实验为CPU软核实验，不涉及开发板外围设备，故不需要开发板
+}
+\subsection{实验任务}
+\subsubsection{实验要求}
+阅读实验原理实现以下模块：
+\begin{enumerate}[(1)]
+    \item Datapath，所有模块均可由实验三复用，需根据不同阶段，修改mux2为mux3(三选一选择器)，以及带有enable(使能)、clear(清除流水线)等信号的触发器，
+    \item Controller，其中main decoder与alu decoder可直接复用，另需增加触发器在不同阶段进行信号传递
+    \item 指令存储器inst\_mem(Single Port Ram)，数据存储器data\_mem(Single Port Ram)；同实验三一致，无需改动，
+    \item 参照实验原理，在单周期基础上加入每个阶段所需要的触发器，重新连接部分信号。实验给出top文件，需兼容top文件端口设定。
+    \item 实验给出仿真程序，最终以仿真输出结果判断是否成功实现要求指令。
+\end{enumerate}
+
+\subsubsection{实验步骤}
+\begin{enumerate}
+    \item 在实验三基础上，加入D触发器，增加流水级数；
+    \item 处理流水线冒险问题，加入暂停和前推机制；
+    \item 导入顶层文件及仿真文件，运行仿真； 
+\end{enumerate}
+
+\subsection{实验环境}
+\begin{table}[htbp]
+    \centering
+    \begin{tabu}{|l|l|}
+        \hline
+        |--top.v& 设计顶层文件，已提供。 \\
+        |----mips.v & MIPS软核顶层文件，将Controller与Datapath连接，已提供 \\
+        % \textcolor{red}{|----pc.v} &\textcolor{red}{D触发器结构。输入为下一条指令地址，输出为当前指令地址。}  \\
+        % |----ram.ip&RAM IP，通过Block memory generator进行实例化。  \\
+        \textcolor{blue}{|------controller.v} &\textcolor{blue}{ 控制器模块，本次实验重点。} \\
+        \textcolor{blue}{|--------maindec.v} & \textcolor{blue}{Main decoder模块，负责译码得到各个组件的控制信号。} \\
+        \textcolor{blue}{|--------aludec.v} & \textcolor{blue}{ALU Decoder模块，负责译码得到ALU控制信号。}\\
+        \textcolor{red}{|------datapath.v}& \textcolor{red}{数据通路模块，自行实现} \\
+        \textcolor{blue}{|--------pc.v} & \textcolor{blue}{PC模块，使用实验二代码} \\
+        \textcolor{blue}{|--------alu.v} & \textcolor{blue}{ALU模块，使用实验一代码} \\
+        \textcolor{green}{|--------sl2.v} & \textcolor{green}{移位模块，参考《其他组件实现.pdf》} \\
+        \textcolor{green}{|--------signext.v} & \textcolor{green}{有符号扩展模块，参考《其他组件实现.pdf》} \\
+        \textcolor{red}{|--------mux2.v} & \textcolor{red}{二选一选择器，自行实现} \\
+        \textcolor{black}{|--------regfile.v} & \textcolor{black}{寄存器堆，已提供} \\
+        \textcolor{black}{|--------adder.v} & \textcolor{black}{加法器，已提供} \\
+        \rowfont{\color{black}}
+        |--------floprc & 带有reset与clear的触发器 \\
+        \rowfont{\color{black}}
+	    |--------flopenr & 带有enable与reset的触发器 \\
+	    \rowfont{\color{black}}
+	    |--------flopenrc & 带有enable、reset与clear的触发器 \\
+	    \rowfont{\color{red}}
+        |--------hazard & 冒险处理模块，自行实现 \\
+        \textit{|----inst\_ram.ip} & \textit{RAM IP，通过Block memory generator进行实例化}\\
+        \textit{|----data\_ram.ip} & \textit{RAM IP，通过Block memory generator进行实例化}\\
+        \hline
+    \end{tabu}
+    \caption{实验文件树}
+    \label{tab:file_tree}
+\end{table}

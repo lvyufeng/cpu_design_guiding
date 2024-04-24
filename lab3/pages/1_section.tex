@@ -1,0 +1,71 @@
+\section{实验三 \quad 简易单周期CPU实验}
+MIPS架构CPU的传统流程可分为\textit{取指、译码、执行、访存、回写}(Instruction Fetch, Decode, Execution, Memory Request, Write Back)，五阶段。
+
+实验一完成了ALU设计并掌握了存储器IP的使用；实验二实现了单周期CPU的取指、译码阶段，完成了PC、控制器的设计。在实验一与实验二的基础上，单周期CPU的设计的各模块已经具备，再引入数字逻辑课程中所实现的多路选择器、加法器等门级组件，通过对原理图的理解，分析单条（单类型）指令在数据通路中的执行路径，依次连接对应端口，即可完成单周期CPU。
+
+在进行本次实验前，你需要具备以下基础能力：
+\begin{enumerate}
+    \item 熟悉Vivado的仿真功能(行为仿真)
+    \item 理解数据通路、控制器的信号
+\end{enumerate}
+
+\subsection{实验目的}
+\begin{enumerate}
+    \item 掌握不同类型指令在数据通路中的执行路径。
+    \item 掌握Vivado仿真方式。
+\end{enumerate}
+\subsection{实验设备}
+\begin{enumerate}
+    \item 计算机1台(尽可能达到8G及以上内存)；
+    \item Xilinx Vivado开发套件(2019.1版本)。
+\end{enumerate}
+\textcolor{red}{注：本次实验为CPU软核实验，不涉及开发板外围设备，故不需要开发板
+}
+\subsection{实验任务}
+\subsubsection{实验要求}
+阅读实验原理实现以下模块：
+\begin{enumerate}[(1)]
+    \item Datapath，其中主要包含alu(实验一已完成)，PC(实验二已完成)，adder、mux2、signext、sl2(其中adder、mux2数字逻辑课程已实现，signext、sl2参见实验原理)，
+    \item Controller(实验二已完成)，其中包含两部分，分别为main\_decoder，alu\_decoder。
+    \item 指令存储器inst\_mem(Single Port Ram)，数据存储器data\_mem(Single Port Ram)；使用Block Memory Generator IP构造指令，注意考虑PC地址位数统一。(参考实验二)
+    \item 参照实验原理，将上述模块依指令执行顺序连接。实验给出top文件，需兼容top文件端口设定。
+    \item 实验给出仿真程序，最终以仿真输出结果判断是否成功实现要求指令。
+\end{enumerate}
+
+\subsubsection{实验步骤}
+\begin{enumerate}
+    \item 从实验一中，导入alu模块；
+    \item 从实验二中导入PC、Controller模块；
+    \item 从数字逻辑实验中导入多路选择器、加法器模块；
+    \item 使用Block Memory，其中inst\_mem导入coe文件;
+    \item 参考实验原理，连接各模块；
+    \item 导入顶层文件及仿真文件，运行仿真； 
+\end{enumerate}
+
+\subsection{实验环境}
+\begin{table}[htbp]
+    \centering
+    \begin{tabular}{|l|l|}
+        \hline
+        |--top.v& 设计顶层文件，已提供。 \\
+        |----mips.v & MIPS软核顶层文件，将Controller与Datapath连接，已提供 \\
+        % \textcolor{red}{|----pc.v} &\textcolor{red}{D触发器结构。输入为下一条指令地址，输出为当前指令地址。}  \\
+        % |----ram.ip&RAM IP，通过Block memory generator进行实例化。  \\
+        \textcolor{blue}{|------controller.v} &\textcolor{blue}{ 控制器模块，本次实验重点。} \\
+        \textcolor{blue}{|--------maindec.v} & \textcolor{blue}{Main decoder模块，负责译码得到各个组件的控制信号。} \\
+        \textcolor{blue}{|--------aludec.v} & \textcolor{blue}{ALU Decoder模块，负责译码得到ALU控制信号。}\\
+        \textcolor{red}{|------datapath.v}& \textcolor{red}{数据通路模块，自行实现} \\
+        \textcolor{blue}{|--------pc.v} & \textcolor{blue}{PC模块，使用实验二代码} \\
+        \textcolor{blue}{|--------alu.v} & \textcolor{blue}{ALU模块，使用实验一代码} \\
+        \textcolor{green}{|--------sl2.v} & \textcolor{green}{移位模块，参考《其他组件实现.pdf》} \\
+        \textcolor{green}{|--------signext.v} & \textcolor{green}{有符号扩展模块，参考《其他组件实现.pdf》} \\
+        \textcolor{red}{|--------mux2.v} & \textcolor{red}{二选一选择器，自行实现} \\
+        \textcolor{black}{|--------regfile.v} & \textcolor{black}{寄存器堆，已提供} \\
+        \textcolor{black}{|--------adder.v} & \textcolor{black}{加法器，已提供} \\
+        \textit{|----inst\_ram.ip} & \textit{RAM IP，通过Block memory generator进行实例化}\\
+        \textit{|----data\_ram.ip} & \textit{RAM IP，通过Block memory generator进行实例化}\\
+        \hline
+    \end{tabular}
+    \caption{实验文件树}
+    \label{tab:file_tree}
+\end{table}
